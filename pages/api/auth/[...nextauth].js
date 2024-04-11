@@ -1,26 +1,29 @@
-import NextAuth, { AuthOptions } from "next-auth";
+import NextAuth from "next-auth";
 import KeycloakProvider from "next-auth/providers/keycloak";
 
 function requestRefreshOfAccessToken(token) {
-  return fetch(`${process.env.KEYCLOAK_ISSUER}/protocol/openid-connect/token`, {
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: process.env.KEYCLOAK_CLIENT_ID,
-      client_secret: process.env.KEYCLOAK_CLIENT_SECRET,
-      grant_type: "refresh_token",
-      refresh_token: token.refreshToken,
-    }),
-    method: "POST",
-    cache: "no-store",
-  });
+  return fetch(
+    `${process.env.NEXT_PUBLIC_KEYCLOAK_ISSUER}/protocol/openid-connect/token`,
+    {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID,
+        client_secret: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_SECRET,
+        grant_type: "refresh_token",
+        refresh_token: token.refreshToken,
+      }),
+      method: "POST",
+      cache: "no-store",
+    },
+  );
 }
 
 const authOptions = {
   providers: [
     KeycloakProvider({
-      clientId: process.env.KEYCLOAK_CLIENT_ID,
-      clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
-      issuer: process.env.KEYCLOAK_ISSUER,
+      clientId: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID,
+      clientSecret: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_SECRET,
+      issuer: process.env.NEXT_PUBLIC_KEYCLOAK_ISSUER,
     }),
   ],
   session: {
@@ -46,7 +49,7 @@ const authOptions = {
 
           if (!response.ok) throw tokens;
 
-          const updatedToken = {
+          return {
             ...token, // Keep the previous token properties
             idToken: tokens.id_token,
             accessToken: tokens.access_token,
@@ -55,12 +58,18 @@ const authOptions = {
             ),
             refreshToken: tokens.refresh_token ?? token.refreshToken,
           };
-          return updatedToken;
         } catch (error) {
           console.error("Error refreshing access token", error);
           return { ...token, error: "RefreshAccessTokenError" };
         }
       }
+    },
+    async session({ session, token }) {
+      if (session) {
+        session.idToken = token.idToken;
+        session.user.id = token.id;
+      }
+      return session;
     },
   },
 };
